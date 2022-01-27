@@ -1,210 +1,193 @@
-const grid = document.querySelector('.grid');
-const flagsLeft = document.getElementById('flagsLeft');
-const result = document.getElementById('result');
-let validCounter = 0;
-let flagsCounter = 0;
-let totalFlags = 10;
+const gameContainer = document.getElementById('gameContainer');
+const scoreBoard = document.getElementById('pointsEarned');
+const GRID_SIZE = 1600;
+const RENDER_INTERVAL = 100;
+const GAME_ROW = 40;
+let gameScore = 0;
+let snakeBody = [800];
 let gameOver = false;
+let gameInterval;
+let inputDirection = -1;
+let gamePaused = false;
+let foodPosition = 780;
 
-//Creating 100 boxes with random bomb locations
-(function createBoxes() {
-    flagsLeft.innerHTML = totalFlags;
-    let classArray = []
-    for (let i = 0; i < 100; i++) {
-        if (i > 89) {
-            classArray.push('bomb')
-        } else classArray.push('valid')
-    }
-    for (let i = 0; i < 100; i++) {
-        let box = document.createElement('div');
-        let index = Math.floor(Math.random() * classArray.length);
-        let className = classArray[index];
-        classArray.splice(index, 1);
-        box.setAttribute('id', i);
-        box.setAttribute('class', className);
-        grid.appendChild(box);
-    }
-})();
+//creating main functionality
+const createBoxes = (total) => {
+     for (let i = 1; i <= total; i++) {
+          let box = document.createElement('div');
+          if (i == foodPosition)
+               box.setAttribute('class', 'food');
+          box.setAttribute('id', `pixel${i}`);
+          gameContainer.appendChild(box);
+     }
+}
+createBoxes(GRID_SIZE);
 
-const getBombsFromNeighbour = (target, val) => {
-    if (val === 0 || val === 9 || val === 90 || val === 99) {
-        setNumberOfBombs(target, cornerCase, val);
-    }
-    else if (val > 0 && val < 9 ||
-        val > 90 && val < 99 ||
-        val === 10 || val === 20 || val === 30 || val === 40 || val === 50 || val === 60 || val === 70 || val === 80 ||
-        val === 19 || val === 29 || val === 39 || val === 49 || val === 59 || val === 69 || val === 79 || val === 89) {
-        setNumberOfBombs(target, edgeCase, val);
-    } else {
-        setNumberOfBombs(target, generalCase, val);
-    }
+function init() {
+     if (!gameOver) {
+          gameInterval = setInterval(() => {
+               update();
+          }, RENDER_INTERVAL);
+     }
+}
+init();
+function update() {
+     updateSnake();
+     draw();
+     updateFood();
 }
 
-//Handle Corner Cases
-const cornerCase = (val) => {
-    let arr;
-    if (val === 0) {
-        arr = [val + 1, val + 10, val + 10 + 1];
-    }
-    else if (val === 9) {
-        arr = [val - 1, val + 10, val + 10 - 1];
-    }
-    else if (val === 90) {
-        arr = [val + 1, val - 10, val - 10 + 1];
-    }
-    else if (val === 99) {
-        arr = [val - 1, val - 10, val - 10 - 1];
-    }
-    return countBombs(arr);
+function draw() {
+     drawSnake();
+     if (snakeHeadIntersection()) {
+          clearInterval(gameInterval);
+     };
 }
 
-//Handle edge cases
-const edgeCase = (val) => {
-    let arr;
-    if (val > 0 && val < 9) {
-        arr = [val + 1, val - 1, val + 10, val + 10 + 1, val + 10 - 1];
-    } else if (val === 10 || val === 20 || val === 30 || val === 40 || val === 50 || val === 60 || val === 70 || val === 80) {
-        arr = [val - 10, val + 10, val + 1, val - 10 + 1, val + 10 + 1];
-    } else if (val > 90 && val < 99) {
-        arr = [val + 1, val - 1, val - 10, val - 10 + 1, val - 10 - 1];
-    } else if (val === 19 || val === 29 || val === 39 || val === 49 || val === 59 || val === 69 || val === 79 || val === 89) {
-        arr = [val - 10, val + 10, val - 1, val - 10 - 1, val + 10 - 1];
-    }
-    return countBombs(arr);
+function updateSnake() {
+     snakeBody.forEach(segment => {
+          let element = document.getElementById(`pixel${segment}`);
+          element.removeAttribute('class');
+     });
+     for (let i = snakeBody.length - 2; i >= 0; i--) {
+          snakeBody[i + 1] = snakeBody[i];
+     }
+     updateSnakeHead();
 }
 
-//Handling Cases other than edge and corner
-const generalCase = (val) => {
-    let arr = [val - 1, val + 1, val - 10, val + 10, val - 10 - 1, val - 10 + 1, val + 10 - 1, val + 10 + 1];
-    return countBombs(arr);
+function updateSnakeHead() {
+     let snakeHead = snakeBody[0];
+     if ((snakeHead % GAME_ROW == 1) && (inputDirection === -1)) {
+          snakeBody[0] += (GAME_ROW - 1);
+     }
+     else if ((snakeHead % GAME_ROW == 0) && (inputDirection === 1)) {
+          snakeBody[0] -= (GAME_ROW - 1);
+     }
+     else if (snakeHead > 0 && snakeHead <= (GAME_ROW) && (inputDirection === -GAME_ROW)) {
+          snakeBody[0] += (GRID_SIZE - GAME_ROW);
+     }
+     else if (snakeHead > (GRID_SIZE - GAME_ROW) && snakeHead <= (GRID_SIZE) && (inputDirection === GAME_ROW)) {
+          snakeBody[0] += (GAME_ROW - GRID_SIZE);
+     } else {
+          snakeBody[0] += inputDirection;
+     }
 }
 
-// Counting Bombs in neighbour
-const countBombs = (arr) => {
-    let bombsInNeighbourHood = 0;
-    arr.forEach(item => {
-        let element = document.getElementById(item.toString());
-        if (element.classList.contains('bomb')) bombsInNeighbourHood++;
-    });
-    return bombsInNeighbourHood;
-}
-//setting class to the box on the basis of number of bombs
-const setNumberOfBombs = (target, cases, val) => {
-    let bombsInNeighbourHood = cases(val);
-    target.setAttribute('data', bombsInNeighbourHood);
-    if (bombsInNeighbourHood === 1) {
-        target.classList.add('one');
-    } else if (bombsInNeighbourHood === 2) {
-        target.classList.add('two');
-    } else if (bombsInNeighbourHood === 3) {
-        target.classList.add('three');
-    } else if (bombsInNeighbourHood === 4) {
-        target.classList.add('four');
-    }
-}
-//setting data attribute to the boxes on the bases of no. of bombs in surroundings 
-const setDataAttribute = () => {
-    let boxes = document.querySelectorAll('.valid, .bomb');
-    boxes.forEach((box, index) => {
-        getBombsFromNeighbour(box, index);
-    })
-}
-setDataAttribute();
-
-//Displaying all Bombs on Game over
-const showAllBombs = () => {
-    let bombs = document.querySelectorAll('.bomb');
-    bombs.forEach(bomb => {
-        bomb.innerHTML = '💣';
-        if (!bomb.classList.contains('checked')) {
-            bomb.classList.add('checked');
-        }
-    })
+function drawSnake() {
+     snakeBody.forEach(segment => {
+          let element = document.getElementById(`pixel${segment}`);
+          element.setAttribute('class', 'snakeBodyPixel');
+     });
+     let snakeHead = document.getElementById(`pixel${snakeBody[0]}`);
+     snakeHead.classList.add(headStyle(inputDirection));
 }
 
-//Checking whether the flaged boxes contain bomb or not
-const checkFlagedBoxesContainBomb = () => {
-    let flagedBoxes = document.querySelectorAll('.flag');
-    for (let i = 0; i < flagedBoxes.length; i++) {
-        if (!flagedBoxes[i].classList.contains('bomb'))
-            return false;
-    }
-    return true;
+function headStyle(position) {
+     let headClass;
+     switch (position) {
+          case 1:
+               headClass = 'ltr';
+               break;
+          case -1:
+               headClass = 'rtl';
+               break;
+          case GAME_ROW:
+               headClass = 'ttb';
+               break;
+          case -GAME_ROW:
+               headClass = 'btt';
+               break;
+     }
+     return headClass;
 }
 
-//on Click
-grid.addEventListener('click', (e) => {
-    e.stopPropagation();
-    //if game not over
-    if (!gameOver) {
-        let target = e.target;
-        let numberOfBombsSurrounded = target.getAttribute('data');
-        let targetClasslist = e.target.classList;
-        //if element contains bomb set game is over
-        if (targetClasslist.contains('bomb')) {
-            gameStatusMessage('LOSE');
-            return;
-        }
-        //if element does not contain bomb
-        else if (targetClasslist.contains('valid')) {
-            //if element contains flag, remove the flag and decrement the flag counter
-            if (target.classList.contains('flag')) {
-                target.classList.remove('flag');
-                flagsCounter--;
-                flagsLeft.innerHTML = totalFlags - flagsCounter;
-                target.innerHTML = numberOfBombsSurrounded;
-            }
-            //if element is not checked , set it to checked and increment the valid counter
-            if (!targetClasslist.contains('checked')) {
-                targetClasslist.add('checked');
-                target.innerHTML = numberOfBombsSurrounded;
-                validCounter += 1;
-                //if validCounter becomes 90 show the message you won the game
-                if (validCounter === 90) {
-                    gameStatusMessage('WIN');
-                }
-            }
-        }
-    }
-}, false);
+function snakeHeadIntersection() {
+     let head = snakeBody[0];
+     let snakeExceptHead = snakeBody.slice(1);
+     return snakeExceptHead.some(segment => head === segment);
+}
 
-//On right click
-grid.addEventListener('contextmenu', e => {
-    e.stopPropagation();
-    //preventing the default behaviour of the right click
-    e.preventDefault();
-    if (!gameOver) {
-        let target = e.target;
-        if (flagsCounter < totalFlags) {
-            //check if element is flagged, if flaged remove flag and decrement the flag counter
-            //else add flag and increment the flag counter
-            if (target.classList.contains('flag')) {
-                target.classList.remove('flag');
-                flagsCounter--;
-                flagsLeft.innerHTML = totalFlags - flagsCounter;
-                target.innerHTML = '';
-            }
-            else if (!target.classList.contains('flag')) {
-                target.classList.add('flag');
-                flagsCounter++;
-                flagsLeft.innerHTML = totalFlags - flagsCounter;
-                target.innerHTML = '🚩';
-                //check if flag counter is equal to total flags
-                // and also check all flagged boxes contain bomb
-                //if they contain bomb display 'you have won message else lose message
-                if (flagsCounter === totalFlags && checkFlagedBoxesContainBomb()) {
-                    gameStatusMessage('WIN');
-                } else if (flagsCounter === 10 && !checkFlagedBoxesContainBomb()) {
-                    gameStatusMessage('LOSE');
-                }
-            }
-        }
-    }
+//Add Event Listeners
+window.addEventListener('keydown', (event) => {
+     getInputDirection(event);
+     pauseResumeGame(event.key);
 });
+function getInputDirection(event) {
+     switch (event.key) {
+          case "ArrowUp":
+               if (inputDirection == GAME_ROW) return;
+               inputDirection = -GAME_ROW;
+               break;
+          case "ArrowDown":
+               if (inputDirection == -GAME_ROW) return;
+               inputDirection = GAME_ROW;
+               break;
+          case "ArrowRight":
+               if (inputDirection == -1) return;
+               inputDirection = 1;
+               break;
+          case "ArrowLeft":
+               if (inputDirection == 1) return;
+               inputDirection = -1;
+               break;
+     }
+}
 
-//set result message
-const gameStatusMessage = (winOrLose) => {
-    result.innerHTML = `GAME OVER: YOU ${winOrLose}!`;
-    gameOver = true;
-    showAllBombs();
+function pauseResumeGame(keyPressed) {
+     if (keyPressed == ' ') {
+          gamePaused = !gamePaused;
+          if (gamePaused) {
+               clearInterval(gameInterval);
+          } else {
+               init();
+          }
+     }
+}
+
+//Food Code
+
+function randomGridPosition() {
+     return Math.floor((Math.random() * GRID_SIZE) + 1);
+}
+
+function updateFood() {
+     if(snakeFoodOverlap()){
+          removeFood(foodPosition);
+          snakeBody.push(foodPosition);
+          drawFood();
+          scoreIncrement();
+     }
+}
+
+function scoreIncrement(){
+     gameScore++;
+     scoreBoard.innerHTML = gameScore;
+}
+
+function removeFood(position){
+     let previousFood = document.getElementById(`pixel${position}`);
+     previousFood.classList.remove('food');
+}
+
+function drawFood() {
+     foodPosition = getRandomFoodPosition();
+     let currentFood = document.getElementById(`pixel${foodPosition}`);
+     currentFood.classList.add('food');
+}
+
+function getRandomFoodPosition() {
+     let newFoodPosition;
+     while (!newFoodPosition || checkFoodOnSnake(newFoodPosition)) {
+          newFoodPosition = randomGridPosition()
+     }
+     return newFoodPosition
+}
+
+function checkFoodOnSnake(foodPosition) {
+     return snakeBody.some(segment => foodPosition === segment);
+}
+
+function snakeFoodOverlap() {
+     if (snakeBody[0] === foodPosition) return true;
+     return false;
 }
